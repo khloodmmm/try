@@ -1,0 +1,174 @@
+# Import necessary modules
+import tkinter as tk  # For GUI components
+from tkinter import messagebox  # For displaying message boxes
+import pickle  # For object serialization
+import os  # For file operations
+
+class BankCustomer:
+    """Class to represent a bank customer"""
+    def __init__(self, custNumber, custName, custPIN, custBalance):
+        # Initialize customer attributes
+        self.custNumber = custNumber  # Unique account number (string)
+        self.custName = custName      # Customer's full name (string)
+        self.custPIN = custPIN        # Security PIN (string, typically 4-6 digits)
+        self.custBalance = custBalance  # Account balance (float)
+
+class BankApp:
+    """Main application class for bank customer management"""
+    
+    def __init__(self, root):
+        """Initialize the main application window"""
+        self.root = root  # Store the root window reference
+        self.root.title("Bank Customer Management System")  # Set window title
+        self.root.geometry("500x400")  # Set initial window size
+        
+        # Name of the file where customer data will be stored
+        self.filename = "zzbank.pick"
+        
+        # Create the data file if it doesn't exist
+        if not os.path.exists(self.filename):
+            # Open file in write-binary mode
+            with open(self.filename, 'wb') as f:
+                pickle.dump([], f)  # Initialize with empty list
+        
+        # Set up all GUI components
+        self.create_widgets()
+    
+    def create_widgets(self):
+        """Create and arrange all GUI components in the window"""
+        
+        # Create a labeled frame for customer input fields
+        input_frame = tk.LabelFrame(self.root, text="Add New Customer", padx=10, pady=10)
+        input_frame.pack(padx=10, pady=10, fill="x")  # Pack with padding
+        
+        # Label and entry for Account Number
+        tk.Label(input_frame, text="Account Number:").grid(row=0, column=0, sticky="e")
+        self.entry_number = tk.Entry(input_frame)  # Entry widget for account number
+        self.entry_number.grid(row=0, column=1, pady=5, padx=5)  # Position in grid
+        
+        # Label and entry for Customer Name
+        tk.Label(input_frame, text="Customer Name:").grid(row=1, column=0, sticky="e")
+        self.entry_name = tk.Entry(input_frame)  # Entry widget for name
+        self.entry_name.grid(row=1, column=1, pady=5, padx=5)  # Position in grid
+        
+        # Label and entry for PIN (shows asterisks for security)
+        tk.Label(input_frame, text="PIN:").grid(row=2, column=0, sticky="e")
+        self.entry_pin = tk.Entry(input_frame, show="*")  # Entry widget that hides input
+        self.entry_pin.grid(row=2, column=1, pady=5, padx=5)  # Position in grid
+        
+        # Label and entry for Initial Balance
+        tk.Label(input_frame, text="Initial Balance:").grid(row=3, column=0, sticky="e")
+        self.entry_balance = tk.Entry(input_frame)  # Entry widget for balance
+        self.entry_balance.grid(row=3, column=1, pady=5, padx=5)  # Position in grid
+        
+        # Button to add new customer (calls add_customer when clicked)
+        add_button = tk.Button(input_frame, text="Add Customer", command=self.add_customer)
+        add_button.grid(row=4, columnspan=2, pady=10)  # Span both columns
+        
+        # Create a labeled frame for displaying customers
+        list_frame = tk.LabelFrame(self.root, text="Customer List", padx=10, pady=10)
+        list_frame.pack(padx=10, pady=10, fill="both", expand=True)  # Fill available space
+        
+        # Create a scrollbar for the listbox
+        scrollbar = tk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)  # Position on right side
+        
+        # Create listbox to display customers with scrollbar
+        self.customer_list = tk.Listbox(list_frame, yscrollcommand=scrollbar.set, width=60)
+        self.customer_list.pack(fill="both", expand=True)  # Fill available space
+        
+        # Configure scrollbar to work with listbox
+        scrollbar.config(command=self.customer_list.yview)
+        
+        # Button to list all customers (calls list_customers when clicked)
+        list_button = tk.Button(self.root, text="List All Customers", command=self.list_customers)
+        list_button.pack(pady=5)  # Position with padding
+    
+    def add_customer(self):
+        """Add a new customer to the bank's records"""
+        try:
+            # Get values from entry widgets and strip whitespace
+            custNumber = self.entry_number.get().strip()
+            custName = self.entry_name.get().strip()
+            custPIN = self.entry_pin.get().strip()
+            custBalance = float(self.entry_balance.get().strip())  # Convert to float
+            
+            # Validate that all required fields have values
+            if not all([custNumber, custName, custPIN]):
+                messagebox.showerror("Error", "All fields are required!")
+                return  # Exit function if validation fails
+            
+            # Load existing customers from file
+            customers = self.load_customers()
+            
+            # Check if account number already exists
+            for customer in customers:
+                if customer.custNumber == custNumber:
+                    messagebox.showerror("Error", "Customer number already exists!")
+                    return  # Exit if duplicate found
+            
+            # Create new BankCustomer object with entered data
+            new_customer = BankCustomer(custNumber, custName, custPIN, custBalance)
+            
+            # Add new customer to the list
+            customers.append(new_customer)
+            
+            # Save updated customer list to file
+            self.save_customers(customers)
+            
+            # Clear all input fields after successful addition
+            self.entry_number.delete(0, tk.END)
+            self.entry_name.delete(0, tk.END)
+            self.entry_pin.delete(0, tk.END)
+            self.entry_balance.delete(0, tk.END)
+            
+            # Show success message
+            messagebox.showinfo("Success", "Customer added successfully!")
+            
+        except ValueError:  # Catch conversion errors (e.g., non-numeric balance)
+            messagebox.showerror("Error", "Invalid input! Balance must be a number.")
+    
+    def list_customers(self):
+        """Display all customers from the data file in the listbox"""
+        # Load customers from file
+        customers = self.load_customers()
+        
+        # Clear the listbox before adding new items
+        self.customer_list.delete(0, tk.END)
+        
+        # Handle case when no customers exist
+        if not customers:
+            self.customer_list.insert(tk.END, "No customers found in records.")
+            return  # Exit function
+        
+        # Add each customer to the listbox in formatted way
+        for customer in customers:
+            # Create formatted string with customer details
+            display_text = f"Acct#: {customer.custNumber}, Name: {customer.custName}, " \
+                          f"Balance: ${customer.custBalance:.2f}"
+            # Insert formatted string into listbox
+            self.customer_list.insert(tk.END, display_text)
+    
+    def load_customers(self):
+        """Load customer data from the pickle file"""
+        try:
+            # Open file in read-binary mode
+            with open(self.filename, 'rb') as f:
+                # Deserialize and return the customer list
+                return pickle.load(f)
+        except (EOFError, pickle.PickleError):
+            # Return empty list if file is empty or corrupted
+            return []
+    
+    def save_customers(self, customers):
+        """Save customer data to the pickle file"""
+        # Open file in write-binary mode
+        with open(self.filename, 'wb') as f:
+            # Serialize and write the customer list to file
+            pickle.dump(customers, f)
+
+# Main program execution
+if __name__ == "__main__":
+    root = tk.Tk()  # Create main Tkinter window
+    app = BankApp(root)  # Create BankApp instance with the window
+    root.mainloop()  # Start the Tkinter event loop
